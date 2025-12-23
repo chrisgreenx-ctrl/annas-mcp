@@ -26,6 +26,8 @@ The environment should contain two variables:
 - `ANNAS_SECRET_KEY`: The API key
 - `ANNAS_DOWNLOAD_PATH`: The path where the documents should be downloaded
 
+These variables can also be stored in an `.env` file in the folder containing the binary.
+
 ## Setup
 
 Download the appropriate binary from [the GitHub Releases section](https://github.com/iosifache/annas-mcp/releases).

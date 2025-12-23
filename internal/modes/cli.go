@@ -11,6 +11,7 @@ import (
 	"github.com/iosifache/annas-mcp/internal/anna"
 	"github.com/iosifache/annas-mcp/internal/logger"
 	"github.com/iosifache/annas-mcp/internal/version"
+	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -18,6 +19,10 @@ import (
 func StartCLI() {
 	l := logger.GetLogger()
 	defer l.Sync()
+
+	if err := godotenv.Load(); err != nil {
+		l.Warn("Error loading .env file", zap.Error(err))
+	}
 
 	rootCmd := &cobra.Command{
 		Use:   "annas-mcp",

@@ -6,3 +6,6 @@ dist
 
 # Binaries
 /annas-mcp
+
+# Environment file
+.env
