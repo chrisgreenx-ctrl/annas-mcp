@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/fang"
@@ -150,6 +151,14 @@ func StartCLI() {
 	var httpPort int
 	var httpTransport string
 
+	// Get default port from PORT env var (used by Render, Railway, Heroku, etc.)
+	defaultPort := 8080
+	if portStr := os.Getenv("PORT"); portStr != "" {
+		if port, err := strconv.Atoi(portStr); err == nil && port > 0 {
+			defaultPort = port
+		}
+	}
+
 	httpCmd := &cobra.Command{
 		Use:   "http",
 		Short: "Start the MCP server with HTTP transport",
@@ -166,7 +175,7 @@ func StartCLI() {
 	}
 
 	httpCmd.Flags().StringVar(&httpHost, "host", "0.0.0.0", "Host to bind the HTTP server to")
-	httpCmd.Flags().IntVar(&httpPort, "port", 8080, "Port to bind the HTTP server to")
+	httpCmd.Flags().IntVar(&httpPort, "port", defaultPort, "Port to bind the HTTP server to (reads from PORT env var if set)")
 	httpCmd.Flags().StringVar(&httpTransport, "transport", "streamable", "Transport type: 'sse' or 'streamable' (recommended)")
 
 	rootCmd.AddCommand(searchCmd)
