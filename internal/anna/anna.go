@@ -8,10 +8,7 @@ import (
 
 	"encoding/json"
 	"errors"
-	"io"
 	"net/http"
-	"os"
-	"path/filepath"
 
 	colly "github.com/gocolly/colly/v2"
 	"github.com/iosifache/annas-mcp/internal/logger"
@@ -124,52 +121,27 @@ func FindBook(query string) ([]*Book, error) {
 	return bookListParsed, nil
 }
 
-func (b *Book) Download(secretKey, folderPath string) error {
+func (b *Book) GetDownloadURL(secretKey string) (string, error) {
 	apiURL := fmt.Sprintf(AnnasDownloadEndpoint, b.Hash, secretKey)
 
 	resp, err := http.Get(apiURL)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer resp.Body.Close()
 
 	var apiResp fastDownloadResponse
 	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
-		return err
+		return "", err
 	}
 	if apiResp.DownloadURL == "" {
 		if apiResp.Error != "" {
-			return errors.New(apiResp.Error)
+			return "", errors.New(apiResp.Error)
 		}
-		return errors.New("failed to get download URL")
+		return "", errors.New("failed to get download URL")
 	}
 
-	downloadResp, err := http.Get(apiResp.DownloadURL)
-	if err != nil {
-		return err
-	}
-	defer downloadResp.Body.Close()
-
-	if downloadResp.StatusCode != http.StatusOK {
-		return errors.New("failed to download file")
-	}
-
-	filename := b.Title + "." + b.Format
-	filename = strings.ReplaceAll(filename, "/", "_")
-	filePath := filepath.Join(folderPath, filename)
-
-	if err := os.MkdirAll(folderPath, os.ModePerm); err != nil {
-		return err
-	}
-
-	out, err := os.Create(filePath)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	_, err = io.Copy(out, downloadResp.Body)
-	return err
+	return apiResp.DownloadURL, nil
 }
 
 func (b *Book) String() string {

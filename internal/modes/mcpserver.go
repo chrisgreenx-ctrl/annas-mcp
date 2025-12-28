@@ -2,6 +2,7 @@ package modes
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/iosifache/annas-mcp/internal/anna"
 	"github.com/iosifache/annas-mcp/internal/logger"
@@ -56,7 +57,6 @@ func DownloadToolHandler(ctx context.Context, req *mcp.CallToolRequest, params D
 		return nil, nil, err
 	}
 	secretKey := env.SecretKey
-	downloadPath := env.DownloadPath
 
 	title := params.Title
 	format := params.Format
@@ -66,11 +66,10 @@ func DownloadToolHandler(ctx context.Context, req *mcp.CallToolRequest, params D
 		Format: format,
 	}
 
-	err = book.Download(secretKey, downloadPath)
+	url, err := book.GetDownloadURL(secretKey)
 	if err != nil {
 		l.Error("Download command failed",
 			zap.String("bookHash", params.BookHash),
-			zap.String("downloadPath", downloadPath),
 			zap.Error(err),
 		)
 		return nil, nil, err
@@ -78,12 +77,11 @@ func DownloadToolHandler(ctx context.Context, req *mcp.CallToolRequest, params D
 
 	l.Info("Download command completed successfully",
 		zap.String("bookHash", params.BookHash),
-		zap.String("downloadPath", downloadPath),
 	)
 
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{&mcp.TextContent{
-			Text: "Book downloaded successfully to path: " + downloadPath,
+			Text: fmt.Sprintf("[%s](%s)", title, url),
 		}},
 	}, nil, nil
 }

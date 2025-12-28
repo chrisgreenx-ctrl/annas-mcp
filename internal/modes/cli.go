@@ -4,9 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strconv"
-	"strings"
 
 	"github.com/charmbracelet/fang"
 	"github.com/iosifache/annas-mcp/internal/anna"
@@ -78,26 +76,15 @@ func StartCLI() {
 	}
 
 	downloadCmd := &cobra.Command{
-		Use:   "download [hash] [filename]",
-		Short: "Download a book by its MD5 hash",
-		Long:  "Download a book by its MD5 hash to the specified filename. Requires ANNAS_SECRET_KEY and ANNAS_DOWNLOAD_PATH environment variables.",
-		Args:  cobra.ExactArgs(2),
+		Use:   "download [hash]",
+		Short: "Get download URL for a book by its MD5 hash",
+		Long:  "Get the download URL for a book by its MD5 hash. Requires ANNAS_SECRET_KEY environment variable.",
+		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			bookHash := args[0]
-			filename := args[1]
-
-			ext := filepath.Ext(filename)
-			if ext == "" {
-				return fmt.Errorf("filename must include an extension (e.g., .pdf, .epub)")
-			}
-			format := strings.TrimPrefix(ext, ".")
-			title := strings.TrimSuffix(filepath.Base(filename), ext)
 
 			l.Info("Download command called",
 				zap.String("bookHash", bookHash),
-				zap.String("filename", filename),
-				zap.String("title", title),
-				zap.String("format", format),
 			)
 
 			env, err := GetEnv()
@@ -107,28 +94,22 @@ func StartCLI() {
 			}
 
 			book := &anna.Book{
-				Hash:   bookHash,
-				Title:  title,
-				Format: format,
+				Hash: bookHash,
 			}
 
-			err = book.Download(env.SecretKey, env.DownloadPath)
+			url, err := book.GetDownloadURL(env.SecretKey)
 			if err != nil {
 				l.Error("Download command failed",
 					zap.String("bookHash", bookHash),
-					zap.String("downloadPath", env.DownloadPath),
 					zap.Error(err),
 				)
-				return fmt.Errorf("failed to download book: %w", err)
+				return fmt.Errorf("failed to get download URL: %w", err)
 			}
 
-			fullPath := filepath.Join(env.DownloadPath, filename)
-			fmt.Printf("Book downloaded successfully to: %s\n", fullPath)
+			fmt.Printf("Download URL: %s\n", url)
 
 			l.Info("Download command completed successfully",
 				zap.String("bookHash", bookHash),
-				zap.String("downloadPath", env.DownloadPath),
-				zap.String("filename", filename),
 			)
 
 			return nil
