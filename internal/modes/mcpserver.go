@@ -38,7 +38,7 @@ func SearchToolHandler(ctx context.Context, req *mcp.CallToolRequest, params Sea
 
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{&mcp.TextContent{Text: bookList}},
-	}, books, nil
+	}, map[string]interface{}{"books": books}, nil
 }
 
 func DownloadToolHandler(ctx context.Context, req *mcp.CallToolRequest, params DownloadParams) (*mcp.CallToolResult, any, error) {
