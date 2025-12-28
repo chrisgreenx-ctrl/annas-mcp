@@ -18,12 +18,11 @@ func GetEnv() (*Env, error) {
 
 	secretKey := os.Getenv("ANNAS_SECRET_KEY")
 	downloadPath := os.Getenv("ANNAS_DOWNLOAD_PATH")
-	if secretKey == "" || downloadPath == "" {
-		err := errors.New("ANNAS_SECRET_KEY and ANNAS_DOWNLOAD_PATH environment variables must be set")
+	if secretKey == "" {
+		err := errors.New("ANNAS_SECRET_KEY environment variable must be set")
 
 		l.Error("Environment variables not set",
 			zap.String("ANNAS_SECRET_KEY", secretKey),
-			zap.String("ANNAS_DOWNLOAD_PATH", downloadPath),
 			zap.Error(err),
 		)
 
