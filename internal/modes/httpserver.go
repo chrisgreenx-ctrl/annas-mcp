@@ -125,8 +125,11 @@ func StartHTTPServer(config HTTPServerConfig) error {
 		}
 
 		configSchema := map[string]interface{}{
+			"$schema":             "http://json-schema.org/draft-07/schema#",
+			"$id":                 "/.well-known/mcp-config",
 			"title":               "Anna's Archive MCP Configuration",
 			"description":         "Configuration for connecting to Anna's Archive MCP server",
+			"x-query-style":       "dot+bracket",
 			"type":                "object",
 			"required":            []string{"secretKey"},
 			"additionalProperties": false,
@@ -165,9 +168,19 @@ func StartHTTPServer(config HTTPServerConfig) error {
 		}
 
 		serverCard := map[string]interface{}{
-			"name":        "annas-mcp",
+			"$schema":         "https://static.modelcontextprotocol.io/schemas/mcp-server-card/v1.json",
+			"version":         "1.0",
+			"protocolVersion": "2024-11-05",
+			"serverInfo": map[string]interface{}{
+				"name":    "annas-mcp",
+				"title":   "Anna's Archive MCP Server",
+				"version": version.GetVersion(),
+			},
 			"description": "Search and download documents from Anna's Archive",
-			"version":     version.GetVersion(),
+			"transport": map[string]interface{}{
+				"type":     config.TransportType,
+				"endpoint": "/mcp",
+			},
 			"capabilities": map[string]interface{}{
 				"tools": []map[string]interface{}{
 					{
