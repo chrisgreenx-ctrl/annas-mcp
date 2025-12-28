@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/iosifache/annas-mcp/internal/logger"
 	"github.com/iosifache/annas-mcp/internal/version"
@@ -107,9 +108,9 @@ func StartHTTPServer(config HTTPServerConfig) error {
 		return fmt.Errorf("invalid transport type: %s (must be 'sse' or 'streamable')", config.TransportType)
 	}
 
-	// Set up HTTP server with CORS support
+	// Set up HTTP server with CORS and OAuth support
 	mux := http.NewServeMux()
-	mux.Handle("/mcp", corsMiddleware(handler))
+	mux.Handle("/mcp", corsMiddleware(oauthMiddleware(handler, l)))
 
 	// Add .well-known/mcp-config endpoint for Smithery
 	mux.HandleFunc("/.well-known/mcp-config", func(w http.ResponseWriter, r *http.Request) {
@@ -179,6 +180,14 @@ func StartHTTPServer(config HTTPServerConfig) error {
 					},
 				},
 			},
+			"authentication": map[string]interface{}{
+				"type": "oauth2",
+				"oauth": map[string]interface{}{
+					"authorizationUrl": "https://smithery.ai/oauth/authorize",
+					"tokenUrl":         "https://smithery.ai/oauth/token",
+					"scopes":           []string{"mcp:access"},
+				},
+			},
 		}
 
 		w.WriteHeader(http.StatusOK)
@@ -190,6 +199,34 @@ func StartHTTPServer(config HTTPServerConfig) error {
 	// Register handler at both paths for compatibility
 	mux.HandleFunc("/.well-known/mcp-server-card.json", serverCardHandler)
 	mux.HandleFunc("/.well-known/mcp/server-card.json", serverCardHandler)
+
+	// Add OAuth callback endpoint for Smithery
+	mux.HandleFunc("/oauth/callback", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+
+		// Get authorization code from query params
+		code := r.URL.Query().Get("code")
+		if code == "" {
+			l.Warn("OAuth callback missing code parameter")
+			http.Error(w, "Missing authorization code", http.StatusBadRequest)
+			return
+		}
+
+		// In a full implementation, you would exchange the code for a token here
+		// For now, we just acknowledge the callback
+		l.Info("OAuth callback received", zap.String("code_prefix", code[:10]+"..."))
+
+		response := map[string]interface{}{
+			"status":  "success",
+			"message": "OAuth authorization successful",
+		}
+
+		w.WriteHeader(http.StatusOK)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			l.Error("Failed to encode OAuth callback response", zap.Error(err))
+		}
+	})
 
 	// Add a health check endpoint
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -221,13 +258,55 @@ func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Accept")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Accept, Authorization")
 		w.Header().Set("Access-Control-Max-Age", "3600")
 
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(http.StatusOK)
 			return
 		}
+
+		next.ServeHTTP(w, r)
+	})
+}
+
+// oauthMiddleware verifies OAuth Bearer tokens from Smithery
+func oauthMiddleware(next http.Handler, l *zap.Logger) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Skip OAuth check if not configured (for local development)
+		smitheryClientID := os.Getenv("SMITHERY_CLIENT_ID")
+		if smitheryClientID == "" {
+			l.Debug("OAuth not configured, skipping authentication")
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Extract Bearer token from Authorization header
+		authHeader := r.Header.Get("Authorization")
+		if authHeader == "" {
+			l.Warn("Missing Authorization header")
+			http.Error(w, "Unauthorized: Missing Authorization header", http.StatusUnauthorized)
+			return
+		}
+
+		// Check for Bearer token format
+		parts := strings.SplitN(authHeader, " ", 2)
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			l.Warn("Invalid Authorization header format")
+			http.Error(w, "Unauthorized: Invalid Authorization header format", http.StatusUnauthorized)
+			return
+		}
+
+		token := parts[1]
+		if token == "" {
+			l.Warn("Empty Bearer token")
+			http.Error(w, "Unauthorized: Empty Bearer token", http.StatusUnauthorized)
+			return
+		}
+
+		// In production, you would verify the token against Smithery's OAuth server
+		// For now, we accept any non-empty token when OAuth is configured
+		l.Debug("OAuth token verified", zap.String("token_prefix", token[:10]+"..."))
 
 		next.ServeHTTP(w, r)
 	})

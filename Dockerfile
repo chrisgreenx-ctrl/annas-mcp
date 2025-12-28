@@ -33,7 +33,9 @@ RUN mkdir -p /tmp/downloads
 # Set default environment variables (can be overridden)
 ENV ANNAS_SECRET_KEY="" \
     ANNAS_DOWNLOAD_PATH="/tmp/downloads" \
-    PORT="8080"
+    PORT="8080" \
+    SMITHERY_CLIENT_ID="" \
+    SMITHERY_CLIENT_SECRET=""
 
 # Expose the default HTTP port
 EXPOSE 8080
