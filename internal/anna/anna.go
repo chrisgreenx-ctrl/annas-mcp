@@ -158,6 +158,10 @@ func (b *Book) Download(secretKey, folderPath string) error {
 	filename = strings.ReplaceAll(filename, "/", "_")
 	filePath := filepath.Join(folderPath, filename)
 
+	if err := os.MkdirAll(folderPath, os.ModePerm); err != nil {
+		return err
+	}
+
 	out, err := os.Create(filePath)
 	if err != nil {
 		return err
