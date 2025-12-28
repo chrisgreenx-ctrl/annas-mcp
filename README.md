@@ -146,21 +146,22 @@ These parameters can be configured in the Smithery dashboard and are passed to t
 
 The server will automatically:
 - Listen on the port provided by Render (via `PORT` environment variable)
-- Use Streamable HTTP transport (modern MCP standard)
+- Use Streamable HTTP transport (modern MCP standard) by default
 - Provide HTTPS endpoints automatically
 - Include health checks at `/health`
 
 #### Endpoints
 
 Once deployed, your MCP server will be available at:
-- **MCP Endpoint**: `https://your-service.onrender.com/mcp`
+- **Streamable HTTP Endpoint**: `https://your-service.onrender.com/mcp` (Recommended)
+- **SSE Endpoint**: `https://your-service.onrender.com/sse` (Alternative for clients requiring SSE)
 - **Health Check**: `https://your-service.onrender.com/health`
 - **MCP Config**: `https://your-service.onrender.com/.well-known/mcp-config`
 - **Server Card**: `https://your-service.onrender.com/.well-known/mcp-server-card.json`
 
 #### Client Configuration
 
-To connect to your Render-deployed MCP server from an MCP client:
+To connect to your Render-deployed MCP server from an MCP client using **Streamable HTTP** (recommended):
 
 ```json
 {
@@ -168,6 +169,18 @@ To connect to your Render-deployed MCP server from an MCP client:
   "transport": {
     "type": "streamable-http",
     "url": "https://your-service.onrender.com/mcp"
+  }
+}
+```
+
+If your client (like some versions of Claude Desktop) requires **SSE**, use the SSE endpoint:
+
+```json
+{
+  "name": "anna-mcp-render",
+  "transport": {
+    "type": "sse",
+    "url": "https://your-service.onrender.com/sse"
   }
 }
 ```
