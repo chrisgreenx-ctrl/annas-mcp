@@ -10,20 +10,20 @@ import (
 	"go.uber.org/zap"
 )
 
-func SearchTool(ctx context.Context, cc *mcp.ServerSession, params *mcp.CallToolParamsFor[SearchParams]) (*mcp.CallToolResultFor[any], error) {
+func SearchToolHandler(ctx context.Context, req *mcp.CallToolRequest, params SearchParams) (*mcp.CallToolResult, any, error) {
 	l := logger.GetLogger()
 
 	l.Info("Search command called",
-		zap.String("searchTerm", params.Arguments.SearchTerm),
+		zap.String("searchTerm", params.SearchTerm),
 	)
 
-	books, err := anna.FindBook(params.Arguments.SearchTerm)
+	books, err := anna.FindBook(params.SearchTerm)
 	if err != nil {
 		l.Error("Search command failed",
-			zap.String("searchTerm", params.Arguments.SearchTerm),
+			zap.String("searchTerm", params.SearchTerm),
 			zap.Error(err),
 		)
-		return nil, err
+		return nil, nil, err
 	}
 
 	bookList := ""
@@ -32,37 +32,36 @@ func SearchTool(ctx context.Context, cc *mcp.ServerSession, params *mcp.CallTool
 	}
 
 	l.Info("Search command completed successfully",
-		zap.String("searchTerm", params.Arguments.SearchTerm),
+		zap.String("searchTerm", params.SearchTerm),
 		zap.Int("resultsCount", len(books)),
 	)
 
-	return &mcp.CallToolResultFor[any]{
-		Content:           []mcp.Content{&mcp.TextContent{Text: bookList}},
-		StructuredContent: books,
-	}, nil
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{&mcp.TextContent{Text: bookList}},
+	}, books, nil
 }
 
-func DownloadTool(ctx context.Context, cc *mcp.ServerSession, params *mcp.CallToolParamsFor[DownloadParams]) (*mcp.CallToolResultFor[any], error) {
+func DownloadToolHandler(ctx context.Context, req *mcp.CallToolRequest, params DownloadParams) (*mcp.CallToolResult, any, error) {
 	l := logger.GetLogger()
 
 	l.Info("Download command called",
-		zap.String("bookHash", params.Arguments.BookHash),
-		zap.String("title", params.Arguments.Title),
-		zap.String("format", params.Arguments.Format),
+		zap.String("bookHash", params.BookHash),
+		zap.String("title", params.Title),
+		zap.String("format", params.Format),
 	)
 
 	env, err := GetEnv()
 	if err != nil {
 		l.Error("Failed to get environment variables", zap.Error(err))
-		return nil, err
+		return nil, nil, err
 	}
 	secretKey := env.SecretKey
 	downloadPath := env.DownloadPath
 
-	title := params.Arguments.Title
-	format := params.Arguments.Format
+	title := params.Title
+	format := params.Format
 	book := &anna.Book{
-		Hash:   params.Arguments.BookHash,
+		Hash:   params.BookHash,
 		Title:  title,
 		Format: format,
 	}
@@ -70,23 +69,23 @@ func DownloadTool(ctx context.Context, cc *mcp.ServerSession, params *mcp.CallTo
 	err = book.Download(secretKey, downloadPath)
 	if err != nil {
 		l.Error("Download command failed",
-			zap.String("bookHash", params.Arguments.BookHash),
+			zap.String("bookHash", params.BookHash),
 			zap.String("downloadPath", downloadPath),
 			zap.Error(err),
 		)
-		return nil, err
+		return nil, nil, err
 	}
 
 	l.Info("Download command completed successfully",
-		zap.String("bookHash", params.Arguments.BookHash),
+		zap.String("bookHash", params.BookHash),
 		zap.String("downloadPath", downloadPath),
 	)
 
-	return &mcp.CallToolResultFor[any]{
+	return &mcp.CallToolResult{
 		Content: []mcp.Content{&mcp.TextContent{
 			Text: "Book downloaded successfully to path: " + downloadPath,
 		}},
-	}, nil
+	}, nil, nil
 }
 
 func StartMCPServer() {
@@ -94,27 +93,16 @@ func StartMCPServer() {
 	defer l.Sync()
 
 	serverVersion := version.GetVersion()
-	l.Info("Starting MCP server",
+	l.Info("Starting MCP server (stdio)",
 		zap.String("name", "annas-mcp"),
 		zap.String("version", serverVersion),
 	)
 
-	server := mcp.NewServer("annas-mcp", serverVersion, nil)
-
-	server.AddTools(
-		mcp.NewServerTool("search", "Search books", SearchTool, mcp.Input(
-			mcp.Property("term", mcp.Description("Term to search for")),
-		)),
-		mcp.NewServerTool("download", "Download a book by its MD5 hash. Requires ANNAS_SECRET_KEY and ANNAS_DOWNLOAD_PATH environment variables.", DownloadTool, mcp.Input(
-			mcp.Property("hash", mcp.Description("MD5 hash of the book to download")),
-			mcp.Property("title", mcp.Description("Book title, used for filename")),
-			mcp.Property("format", mcp.Description("Book format, for example pdf or epub")),
-		)),
-	)
+	server := createMCPServer()
 
 	l.Info("MCP server started successfully")
 
-	if err := server.Run(context.Background(), mcp.NewStdioTransport()); err != nil {
+	if err := server.Run(context.Background(), &mcp.StdioTransport{}); err != nil {
 		l.Fatal("MCP server failed", zap.Error(err))
 	}
 }

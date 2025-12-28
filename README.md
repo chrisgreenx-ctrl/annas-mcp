@@ -12,6 +12,13 @@
 | Search Anna's Archive for documents matching specified terms                   | `search`   | `search`    |
 | Download a specific document that was previously returned by the `search` tool | `download` | `download`  |
 
+## Server Modes
+
+This MCP server supports two modes of operation:
+
+1. **Stdio Mode** (default): For local MCP clients like Claude Desktop
+2. **HTTP Mode**: For remote MCP clients using SSE or Streamable HTTP transport
+
 ## Requirements
 
 If you plan to use only the CLI tool, you need:
@@ -32,7 +39,9 @@ These variables can also be stored in an `.env` file in the folder containing th
 
 Download the appropriate binary from [the GitHub Releases section](https://github.com/iosifache/annas-mcp/releases).
 
-If you plan to use the tool for its MCP server functionality, you need to integrate it into your MCP client. If you are using Claude Desktop, please consider the following example configuration:
+### Stdio Mode (Local)
+
+If you plan to use the tool for its MCP server functionality with a local client, you need to integrate it into your MCP client. If you are using Claude Desktop, please consider the following example configuration:
 
 ```json
 "anna-mcp": {
@@ -44,6 +53,73 @@ If you plan to use the tool for its MCP server functionality, you need to integr
     }
 }
 ```
+
+### HTTP Mode (Remote)
+
+To run the MCP server as a remote HTTP server, use the `http` command:
+
+```bash
+# Using Streamable HTTP (recommended, MCP 2025-03-26 spec)
+./annas-mcp http --host 0.0.0.0 --port 8080 --transport streamable
+
+# Or using SSE (legacy, MCP 2024-11-05 spec)
+./annas-mcp http --host 0.0.0.0 --port 8080 --transport sse
+```
+
+Environment variables should still be set:
+
+```bash
+export ANNAS_SECRET_KEY="feedfacecafebeef"
+export ANNAS_DOWNLOAD_PATH="/path/to/downloads"
+./annas-mcp http
+```
+
+Or use a `.env` file in the same directory as the binary.
+
+The server will be accessible at:
+- **Endpoint**: `http://<host>:<port>/mcp`
+- **Health check**: `http://<host>:<port>/health`
+
+To connect to the HTTP server from an MCP client, configure it to use the remote transport. For example, in your MCP client configuration:
+
+```json
+{
+  "name": "anna-mcp-remote",
+  "transport": {
+    "type": "streamable-http",
+    "url": "http://localhost:8080/mcp"
+  }
+}
+```
+
+### Smithery Hosting (Recommended for Remote Access)
+
+[Smithery](https://smithery.ai) provides hassle-free hosting for MCP servers. This server is configured for Smithery deployment.
+
+#### Quick Start with Smithery
+
+1. Fork or clone this repository
+2. Sign up at [Smithery.ai](https://smithery.ai)
+3. Connect your repository to Smithery
+4. Configure your API key in the Smithery dashboard:
+   - `secretKey`: Your Anna's Archive API key
+   - `downloadPath`: Path for downloads (default: `/tmp/downloads`)
+5. Deploy!
+
+Smithery will automatically:
+- Build the Docker container
+- Deploy the server using Streamable HTTP transport
+- Handle configuration via query parameters
+- Provide a public URL for your MCP server
+
+#### Configuration
+
+The `smithery.yaml` file in this repository configures the deployment. The server accepts two configuration parameters:
+
+- **secretKey** (required): Your Anna's Archive API key - get one at [Anna's Archive API FAQ](https://annas-archive.org/faq#api)
+- **downloadPath** (optional): Where to store downloaded documents (defaults to `/tmp/downloads`)
+
+These parameters can be configured in the Smithery dashboard and are passed to the server via query parameters.
 
 ## Demo
 

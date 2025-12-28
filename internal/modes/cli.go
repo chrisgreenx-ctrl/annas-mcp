@@ -136,8 +136,8 @@ func StartCLI() {
 
 	mcpCmd := &cobra.Command{
 		Use:   "mcp",
-		Short: "Start the MCP server",
-		Long:  "Start the Model Context Protocol (MCP) server for integration with AI assistants.",
+		Short: "Start the MCP server (stdio)",
+		Long:  "Start the Model Context Protocol (MCP) server using stdio transport for integration with AI assistants.",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Exit CLI mode and start MCP server
@@ -146,9 +146,33 @@ func StartCLI() {
 		},
 	}
 
+	var httpHost string
+	var httpPort int
+	var httpTransport string
+
+	httpCmd := &cobra.Command{
+		Use:   "http",
+		Short: "Start the MCP server with HTTP transport",
+		Long:  "Start the Model Context Protocol (MCP) server using HTTP transport (SSE or Streamable HTTP) for remote access.",
+		Args:  cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			config := HTTPServerConfig{
+				Host:          httpHost,
+				Port:          httpPort,
+				TransportType: httpTransport,
+			}
+			return StartHTTPServer(config)
+		},
+	}
+
+	httpCmd.Flags().StringVar(&httpHost, "host", "0.0.0.0", "Host to bind the HTTP server to")
+	httpCmd.Flags().IntVar(&httpPort, "port", 8080, "Port to bind the HTTP server to")
+	httpCmd.Flags().StringVar(&httpTransport, "transport", "streamable", "Transport type: 'sse' or 'streamable' (recommended)")
+
 	rootCmd.AddCommand(searchCmd)
 	rootCmd.AddCommand(downloadCmd)
 	rootCmd.AddCommand(mcpCmd)
+	rootCmd.AddCommand(httpCmd)
 
 	if err := fang.Execute(
 		context.Background(),
