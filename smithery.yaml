@@ -21,6 +21,8 @@ startCommand:
   exampleConfig:
     secretKey: "3K2dSUFJzMZ75yxpgKKK3oatGhV9a"
     downloadPath: "/tmp/downloads"
+  oauth:
+    required: false
 
 build:
   dockerfile: "Dockerfile"

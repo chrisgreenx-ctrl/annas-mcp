@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/iosifache/annas-mcp/internal/logger"
 	"github.com/iosifache/annas-mcp/internal/version"
@@ -107,9 +108,9 @@ func StartHTTPServer(config HTTPServerConfig) error {
 		return fmt.Errorf("invalid transport type: %s (must be 'sse' or 'streamable')", config.TransportType)
 	}
 
-	// Set up HTTP server with CORS support
+	// Set up HTTP server with CORS and API key authentication
 	mux := http.NewServeMux()
-	mux.Handle("/mcp", corsMiddleware(handler))
+	mux.Handle("/mcp", corsMiddleware(apiKeyMiddleware(handler, l)))
 
 	// Add .well-known/mcp-config endpoint for Smithery
 	mux.HandleFunc("/.well-known/mcp-config", func(w http.ResponseWriter, r *http.Request) {
@@ -153,34 +154,44 @@ func StartHTTPServer(config HTTPServerConfig) error {
 		}
 	})
 
-	// Add .well-known/mcp/server-card.json endpoint for server discovery
-	mux.HandleFunc("/.well-known/mcp/server-card.json", func(w http.ResponseWriter, r *http.Request) {
+	// Add .well-known/mcp-server-card.json endpoint for server discovery (Smithery standard)
+	serverCardHandler := func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 		w.Header().Set("Cache-Control", "public, max-age=3600")
 
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
 		serverCard := map[string]interface{}{
-			"$schema":         "https://modelcontextprotocol.io/schema/server-card.json",
+			"$schema":         "https://static.modelcontextprotocol.io/schemas/mcp-server-card/v1.json",
 			"version":         "1.0",
-			"protocolVersion": "2025-06-18",
+			"protocolVersion": "2024-11-05",
 			"serverInfo": map[string]interface{}{
-				"name":        "annas-mcp",
-				"title":       "Anna's Archive MCP Server",
-				"version":     version.GetVersion(),
-				"description": "Search and download documents from Anna's Archive",
+				"name":    "annas-mcp",
+				"title":   "Anna's Archive MCP Server",
+				"version": version.GetVersion(),
 			},
+			"description": "Search and download documents from Anna's Archive",
 			"transport": map[string]interface{}{
 				"type":     config.TransportType,
 				"endpoint": "/mcp",
 			},
 			"capabilities": map[string]interface{}{
-				"tools": "dynamic",
-			},
-			"authentication": map[string]interface{}{
-				"required": false,
-				"schemes":  []string{},
+				"tools": []map[string]interface{}{
+					{
+						"name":        "search",
+						"description": "Search books on Anna's Archive",
+					},
+					{
+						"name":        "download",
+						"description": "Download a book by its MD5 hash",
+					},
+				},
 			},
 		}
 
@@ -188,7 +199,12 @@ func StartHTTPServer(config HTTPServerConfig) error {
 		if err := json.NewEncoder(w).Encode(serverCard); err != nil {
 			l.Error("Failed to encode server card", zap.Error(err))
 		}
-	})
+	}
+
+	// Register handler at both paths for compatibility
+	mux.HandleFunc("/.well-known/mcp-server-card.json", serverCardHandler)
+	mux.HandleFunc("/.well-known/mcp/server-card.json", serverCardHandler)
+
 
 	// Add a health check endpoint
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -220,7 +236,7 @@ func corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Accept")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Accept, Authorization, X-API-Key")
 		w.Header().Set("Access-Control-Max-Age", "3600")
 
 		if r.Method == "OPTIONS" {
@@ -228,6 +244,51 @@ func corsMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
+		next.ServeHTTP(w, r)
+	})
+}
+
+// apiKeyMiddleware verifies API keys from Smithery or other clients
+func apiKeyMiddleware(next http.Handler, l *zap.Logger) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Skip API key check if not configured (for local development)
+		smitheryAPIKey := os.Getenv("SMITHERY_API_KEY")
+		if smitheryAPIKey == "" {
+			l.Debug("API key authentication not configured, allowing all requests")
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Extract Bearer token or X-API-Key from headers
+		authHeader := r.Header.Get("Authorization")
+		apiKeyHeader := r.Header.Get("X-API-Key")
+
+		var providedKey string
+
+		if authHeader != "" {
+			// Check for Bearer token format
+			parts := strings.SplitN(authHeader, " ", 2)
+			if len(parts) == 2 && parts[0] == "Bearer" {
+				providedKey = parts[1]
+			}
+		} else if apiKeyHeader != "" {
+			providedKey = apiKeyHeader
+		}
+
+		if providedKey == "" {
+			l.Warn("Missing API key in Authorization or X-API-Key header")
+			http.Error(w, "Unauthorized: Missing API key", http.StatusUnauthorized)
+			return
+		}
+
+		// Verify the API key matches
+		if providedKey != smitheryAPIKey {
+			l.Warn("Invalid API key provided")
+			http.Error(w, "Unauthorized: Invalid API key", http.StatusUnauthorized)
+			return
+		}
+
+		l.Debug("API key verified successfully")
 		next.ServeHTTP(w, r)
 	})
 }

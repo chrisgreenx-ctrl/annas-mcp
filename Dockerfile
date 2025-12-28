@@ -33,7 +33,8 @@ RUN mkdir -p /tmp/downloads
 # Set default environment variables (can be overridden)
 ENV ANNAS_SECRET_KEY="" \
     ANNAS_DOWNLOAD_PATH="/tmp/downloads" \
-    PORT="8080"
+    PORT="8080" \
+    SMITHERY_API_KEY=""
 
 # Expose the default HTTP port
 EXPOSE 8080
@@ -42,5 +43,5 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 
-# Run the HTTP server by default
-CMD ["./annas-mcp", "http", "--host", "0.0.0.0", "--port", "8080", "--transport", "streamable"]
+# Run the HTTP server by default with SSE transport (better Smithery compatibility)
+CMD ["./annas-mcp", "http", "--host", "0.0.0.0", "--port", "8080", "--transport", "sse"]
