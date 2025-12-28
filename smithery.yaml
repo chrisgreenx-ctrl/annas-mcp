@@ -22,14 +22,7 @@ startCommand:
     secretKey: "3K2dSUFJzMZ75yxpgKKK3oatGhV9a"
     downloadPath: "/tmp/downloads"
   oauth:
-    required: true
-    clientIdEnvVar: "SMITHERY_CLIENT_ID"
-    clientSecretEnvVar: "SMITHERY_CLIENT_SECRET"
-    authorizationUrl: "https://smithery.ai/oauth/authorize"
-    tokenUrl: "https://smithery.ai/oauth/token"
-    redirectPath: "/oauth/callback"
-    scopes:
-      - "mcp:access"
+    required: false
 
 build:
   dockerfile: "Dockerfile"
