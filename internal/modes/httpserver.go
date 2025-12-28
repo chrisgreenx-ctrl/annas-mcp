@@ -1,6 +1,7 @@
 package modes
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -109,6 +110,75 @@ func StartHTTPServer(config HTTPServerConfig) error {
 	// Set up HTTP server with CORS support
 	mux := http.NewServeMux()
 	mux.Handle("/mcp", corsMiddleware(handler))
+
+	// Add .well-known/mcp-config endpoint for Smithery
+	mux.HandleFunc("/.well-known/mcp-config", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+		configSchema := map[string]interface{}{
+			"$schema":     "http://json-schema.org/draft-07/schema#",
+			"$id":         "/.well-known/mcp-config",
+			"title":       "Anna's Archive MCP Configuration",
+			"description": "Configuration for connecting to Anna's Archive MCP server",
+			"x-query-style": "dot+bracket",
+			"type":        "object",
+			"properties": map[string]interface{}{
+				"secretKey": map[string]interface{}{
+					"type":        "string",
+					"title":       "Anna's Archive API Key",
+					"description": "Your Anna's Archive API key for accessing the JSON API. Get one at https://annas-archive.org/faq#api",
+				},
+				"downloadPath": map[string]interface{}{
+					"type":        "string",
+					"title":       "Download Path",
+					"description": "Path where downloaded documents will be stored",
+					"default":     "/tmp/downloads",
+				},
+			},
+			"required":             []string{"secretKey"},
+			"additionalProperties": false,
+		}
+
+		w.WriteHeader(http.StatusOK)
+		if err := json.NewEncoder(w).Encode(configSchema); err != nil {
+			l.Error("Failed to encode config schema", zap.Error(err))
+		}
+	})
+
+	// Add .well-known/mcp/server-card.json endpoint for server discovery
+	mux.HandleFunc("/.well-known/mcp/server-card.json", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+		serverCard := map[string]interface{}{
+			"$schema":         "https://modelcontextprotocol.io/schema/server-card.json",
+			"version":         "1.0",
+			"protocolVersion": "2024-11-05",
+			"serverInfo": map[string]interface{}{
+				"name":    "annas-mcp",
+				"title":   "Anna's Archive MCP Server",
+				"version": version.GetVersion(),
+				"description": "Search and download documents from Anna's Archive",
+			},
+			"transport": map[string]interface{}{
+				"type":     config.TransportType,
+				"endpoint": "/mcp",
+			},
+			"capabilities": map[string]interface{}{
+				"tools": "dynamic",
+			},
+		}
+
+		w.WriteHeader(http.StatusOK)
+		if err := json.NewEncoder(w).Encode(serverCard); err != nil {
+			l.Error("Failed to encode server card", zap.Error(err))
+		}
+	})
 
 	// Add a health check endpoint
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {

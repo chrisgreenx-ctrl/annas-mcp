@@ -27,8 +27,20 @@ WORKDIR /root/
 # Copy the binary from builder
 COPY --from=builder /app/annas-mcp .
 
+# Create downloads directory
+RUN mkdir -p /tmp/downloads
+
+# Set default environment variables (can be overridden)
+ENV ANNAS_SECRET_KEY="" \
+    ANNAS_DOWNLOAD_PATH="/tmp/downloads" \
+    PORT="8080"
+
 # Expose the default HTTP port
 EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 
 # Run the HTTP server by default
 CMD ["./annas-mcp", "http", "--host", "0.0.0.0", "--port", "8080", "--transport", "streamable"]
