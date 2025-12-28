@@ -34,51 +34,41 @@ func StartHTTPServer(config HTTPServerConfig) error {
 		zap.String("transport", config.TransportType),
 	)
 
-	// Create HTTP handler based on transport type
-	var handler http.Handler
+	// Server factory used by both transports
+	serverFactory := func(r *http.Request) *mcp.Server {
+		env, err := LoadEnv(r)
+		if err != nil {
+			l.Error("Failed to load environment", zap.Error(err))
+		}
+		if env == nil {
+			env = &Env{} // Empty env to avoid panic
+		}
+		return createMCPServer(env)
+	}
+
+	// Create handlers for both transports
+	sseHandler := mcp.NewSSEHandler(serverFactory, nil)
+	streamableHandler := mcp.NewStreamableHTTPHandler(serverFactory, nil)
+
+	// Determine the primary handler based on transport type (for /mcp endpoint)
+	var primaryHandler http.Handler
 	switch config.TransportType {
 	case "sse":
-		handler = mcp.NewSSEHandler(
-			func(r *http.Request) *mcp.Server {
-				env, err := LoadEnv(r)
-				if err != nil {
-					l.Error("Failed to load environment", zap.Error(err))
-					// We might want to return a server with no tools or one that errors
-					// But for now we'll proceed (NewDownloadToolHandler might fail later if secret is missing)
-					// Actually LoadEnv returns error if secret is missing, so we should probably handle it.
-					// Since we can't return error here, we'll pass a potentially incomplete env?
-					// LoadEnv returns nil Env on error? No, it might return partial env.
-					// Let's assume best effort.
-				}
-				if env == nil {
-					env = &Env{} // Empty env to avoid panic
-				}
-				return createMCPServer(env)
-			},
-			nil,
-		)
+		primaryHandler = sseHandler
 	case "streamable":
-		// Create streamable HTTP handler
-		handler = mcp.NewStreamableHTTPHandler(
-			func(r *http.Request) *mcp.Server {
-				env, err := LoadEnv(r)
-				if err != nil {
-					l.Error("Failed to load environment", zap.Error(err))
-				}
-				if env == nil {
-					env = &Env{}
-				}
-				return createMCPServer(env)
-			},
-			nil,
-		)
+		primaryHandler = streamableHandler
 	default:
 		return fmt.Errorf("invalid transport type: %s (must be 'sse' or 'streamable')", config.TransportType)
 	}
 
 	// Set up HTTP server with CORS and API key authentication
 	mux := http.NewServeMux()
-	mux.Handle("/mcp", corsMiddleware(apiKeyMiddleware(recoveryMiddleware(handler, l), l)))
+
+	// Mount the primary handler at /mcp (for backward compatibility and flag respect)
+	mux.Handle("/mcp", corsMiddleware(apiKeyMiddleware(recoveryMiddleware(primaryHandler, l), l)))
+
+	// Mount SSE handler explicitly at /sse (always available as fallback)
+	mux.Handle("/sse", corsMiddleware(apiKeyMiddleware(recoveryMiddleware(sseHandler, l), l)))
 
 	// Add .well-known/mcp-config endpoint for Smithery
 	mux.HandleFunc("/.well-known/mcp-config", func(w http.ResponseWriter, r *http.Request) {
