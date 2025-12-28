@@ -115,16 +115,23 @@ func StartHTTPServer(config HTTPServerConfig) error {
 	mux.HandleFunc("/.well-known/mcp-config", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
 		configSchema := map[string]interface{}{
-			"$schema":     "http://json-schema.org/draft-07/schema#",
-			"$id":         "/.well-known/mcp-config",
-			"title":       "Anna's Archive MCP Configuration",
-			"description": "Configuration for connecting to Anna's Archive MCP server",
-			"x-query-style": "dot+bracket",
-			"type":        "object",
+			"$schema":             "http://json-schema.org/draft-07/schema#",
+			"$id":                 "/.well-known/mcp-config",
+			"title":               "Anna's Archive MCP Configuration",
+			"description":         "Configuration for connecting to Anna's Archive MCP server",
+			"x-query-style":       "dot+bracket",
+			"type":                "object",
+			"required":            []string{"secretKey"},
+			"additionalProperties": false,
 			"properties": map[string]interface{}{
 				"secretKey": map[string]interface{}{
 					"type":        "string",
@@ -138,8 +145,6 @@ func StartHTTPServer(config HTTPServerConfig) error {
 					"default":     "/tmp/downloads",
 				},
 			},
-			"required":             []string{"secretKey"},
-			"additionalProperties": false,
 		}
 
 		w.WriteHeader(http.StatusOK)
@@ -154,15 +159,16 @@ func StartHTTPServer(config HTTPServerConfig) error {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Set("Cache-Control", "public, max-age=3600")
 
 		serverCard := map[string]interface{}{
 			"$schema":         "https://modelcontextprotocol.io/schema/server-card.json",
 			"version":         "1.0",
-			"protocolVersion": "2024-11-05",
+			"protocolVersion": "2025-06-18",
 			"serverInfo": map[string]interface{}{
-				"name":    "annas-mcp",
-				"title":   "Anna's Archive MCP Server",
-				"version": version.GetVersion(),
+				"name":        "annas-mcp",
+				"title":       "Anna's Archive MCP Server",
+				"version":     version.GetVersion(),
 				"description": "Search and download documents from Anna's Archive",
 			},
 			"transport": map[string]interface{}{
@@ -171,6 +177,10 @@ func StartHTTPServer(config HTTPServerConfig) error {
 			},
 			"capabilities": map[string]interface{}{
 				"tools": "dynamic",
+			},
+			"authentication": map[string]interface{}{
+				"required": false,
+				"schemes":  []string{},
 			},
 		}
 

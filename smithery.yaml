@@ -3,6 +3,8 @@ runtime: "container"
 startCommand:
   type: "http"
   configSchema:
+    title: "Anna's Archive MCP Configuration"
+    description: "Configuration for connecting to Anna's Archive MCP server"
     type: "object"
     required: ["secretKey"]
     properties:
@@ -15,6 +17,7 @@ startCommand:
         title: "Download Path"
         description: "Path where downloaded documents will be stored"
         default: "/tmp/downloads"
+    additionalProperties: false
   exampleConfig:
     secretKey: "3K2dSUFJzMZ75yxpgKKK3oatGhV9a"
     downloadPath: "/tmp/downloads"
