@@ -97,16 +97,13 @@ func StartHTTPServer(config HTTPServerConfig) error {
 			nil,
 		)
 	case "streamable":
-		// Add logger to streamable HTTP options
-		opts := &mcp.StreamableHTTPOptions{
-			Logger: l,
-		}
+		// Create streamable HTTP handler (Logger field removed due to type incompatibility)
 		handler = mcp.NewStreamableHTTPHandler(
 			func(r *http.Request) *mcp.Server {
 				configureEnvFromRequest(r, l)
 				return createMCPServer()
 			},
-			opts,
+			nil,
 		)
 	default:
 		return fmt.Errorf("invalid transport type: %s (must be 'sse' or 'streamable')", config.TransportType)
