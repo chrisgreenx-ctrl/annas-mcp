@@ -124,11 +124,8 @@ func StartHTTPServer(config HTTPServerConfig) error {
 		}
 
 		configSchema := map[string]interface{}{
-			"$schema":             "http://json-schema.org/draft-07/schema#",
-			"$id":                 "/.well-known/mcp-config",
 			"title":               "Anna's Archive MCP Configuration",
 			"description":         "Configuration for connecting to Anna's Archive MCP server",
-			"x-query-style":       "dot+bracket",
 			"type":                "object",
 			"required":            []string{"secretKey"},
 			"additionalProperties": false,
@@ -153,34 +150,34 @@ func StartHTTPServer(config HTTPServerConfig) error {
 		}
 	})
 
-	// Add .well-known/mcp/server-card.json endpoint for server discovery
-	mux.HandleFunc("/.well-known/mcp/server-card.json", func(w http.ResponseWriter, r *http.Request) {
+	// Add .well-known/mcp-server-card.json endpoint for server discovery (Smithery standard)
+	serverCardHandler := func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 		w.Header().Set("Cache-Control", "public, max-age=3600")
 
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
 		serverCard := map[string]interface{}{
-			"$schema":         "https://modelcontextprotocol.io/schema/server-card.json",
-			"version":         "1.0",
-			"protocolVersion": "2025-06-18",
-			"serverInfo": map[string]interface{}{
-				"name":        "annas-mcp",
-				"title":       "Anna's Archive MCP Server",
-				"version":     version.GetVersion(),
-				"description": "Search and download documents from Anna's Archive",
-			},
-			"transport": map[string]interface{}{
-				"type":     config.TransportType,
-				"endpoint": "/mcp",
-			},
+			"name":        "annas-mcp",
+			"description": "Search and download documents from Anna's Archive",
+			"version":     version.GetVersion(),
 			"capabilities": map[string]interface{}{
-				"tools": "dynamic",
-			},
-			"authentication": map[string]interface{}{
-				"required": false,
-				"schemes":  []string{},
+				"tools": []map[string]interface{}{
+					{
+						"name":        "search",
+						"description": "Search books on Anna's Archive",
+					},
+					{
+						"name":        "download",
+						"description": "Download a book by its MD5 hash",
+					},
+				},
 			},
 		}
 
@@ -188,7 +185,11 @@ func StartHTTPServer(config HTTPServerConfig) error {
 		if err := json.NewEncoder(w).Encode(serverCard); err != nil {
 			l.Error("Failed to encode server card", zap.Error(err))
 		}
-	})
+	}
+
+	// Register handler at both paths for compatibility
+	mux.HandleFunc("/.well-known/mcp-server-card.json", serverCardHandler)
+	mux.HandleFunc("/.well-known/mcp/server-card.json", serverCardHandler)
 
 	// Add a health check endpoint
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
