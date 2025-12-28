@@ -121,6 +121,81 @@ The `smithery.yaml` file in this repository configures the deployment. The serve
 
 These parameters can be configured in the Smithery dashboard and are passed to the server via query parameters.
 
+### Render Deployment (Production-Ready HTTPS MCP)
+
+[Render](https://render.com) provides production-ready hosting with automatic HTTPS, making it ideal for deploying MCP servers.
+
+#### Quick Start with Render
+
+1. **Fork or clone this repository**
+2. **Sign up at [Render.com](https://render.com)**
+3. **Create a new Web Service**:
+   - Connect your GitHub repository
+   - Render will automatically detect the `render.yaml` configuration
+   - Or manually configure:
+     - **Runtime**: Docker
+     - **Dockerfile Path**: `./Dockerfile`
+     - **Health Check Path**: `/health`
+4. **Configure environment variables** in the Render dashboard:
+   - `ANNAS_SECRET_KEY` (required): Your Anna's Archive API key from [Anna's Archive API FAQ](https://annas-archive.org/faq#api)
+   - `ANNAS_DOWNLOAD_PATH` (optional): Defaults to `/tmp/downloads`
+   - `SMITHERY_API_KEY` (optional): For API key authentication
+5. **Deploy!**
+
+#### Configuration
+
+The server will automatically:
+- Listen on the port provided by Render (via `PORT` environment variable)
+- Use Streamable HTTP transport (modern MCP standard)
+- Provide HTTPS endpoints automatically
+- Include health checks at `/health`
+
+#### Endpoints
+
+Once deployed, your MCP server will be available at:
+- **MCP Endpoint**: `https://your-service.onrender.com/mcp`
+- **Health Check**: `https://your-service.onrender.com/health`
+- **MCP Config**: `https://your-service.onrender.com/.well-known/mcp-config`
+- **Server Card**: `https://your-service.onrender.com/.well-known/mcp-server-card.json`
+
+#### Client Configuration
+
+To connect to your Render-deployed MCP server from an MCP client:
+
+```json
+{
+  "name": "anna-mcp-render",
+  "transport": {
+    "type": "streamable-http",
+    "url": "https://your-service.onrender.com/mcp"
+  }
+}
+```
+
+If you configured `SMITHERY_API_KEY`, include it in your client:
+
+```json
+{
+  "name": "anna-mcp-render",
+  "transport": {
+    "type": "streamable-http",
+    "url": "https://your-service.onrender.com/mcp",
+    "headers": {
+      "Authorization": "Bearer YOUR_SMITHERY_API_KEY"
+    }
+  }
+}
+```
+
+#### Benefits of Render Deployment
+
+- ✅ **Automatic HTTPS**: Render provides free SSL certificates
+- ✅ **Zero-downtime deploys**: Automatic health checks during deployment
+- ✅ **Auto-scaling**: Handles traffic spikes automatically
+- ✅ **Persistent storage**: Use Render Disks for downloaded documents
+- ✅ **Environment management**: Secure environment variable storage
+- ✅ **Easy monitoring**: Built-in logs and metrics
+
 ## Demo
 
 ### As an MCP Server

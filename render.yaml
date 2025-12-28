@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: annas-mcp
+    runtime: docker
+    plan: starter
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+
+    envVars:
+      - key: ANNAS_SECRET_KEY
+        sync: false
+      - key: ANNAS_DOWNLOAD_PATH
+        value: /tmp/downloads
+      - key: PORT
+        value: 8080
+      - key: SMITHERY_API_KEY
+        sync: false
+
+    autoDeploy: true
+
+    # Render automatically provides HTTPS
+    # The service will be available at: https://annas-mcp.onrender.com/mcp
