@@ -97,12 +97,16 @@ func StartHTTPServer(config HTTPServerConfig) error {
 			nil,
 		)
 	case "streamable":
+		// Add logger to streamable HTTP options
+		opts := &mcp.StreamableHTTPOptions{
+			Logger: l,
+		}
 		handler = mcp.NewStreamableHTTPHandler(
 			func(r *http.Request) *mcp.Server {
 				configureEnvFromRequest(r, l)
 				return createMCPServer()
 			},
-			nil,
+			opts,
 		)
 	default:
 		return fmt.Errorf("invalid transport type: %s (must be 'sse' or 'streamable')", config.TransportType)
@@ -110,7 +114,7 @@ func StartHTTPServer(config HTTPServerConfig) error {
 
 	// Set up HTTP server with CORS and API key authentication
 	mux := http.NewServeMux()
-	mux.Handle("/mcp", corsMiddleware(apiKeyMiddleware(handler, l)))
+	mux.Handle("/mcp", corsMiddleware(apiKeyMiddleware(recoveryMiddleware(handler, l), l)))
 
 	// Add .well-known/mcp-config endpoint for Smithery
 	mux.HandleFunc("/.well-known/mcp-config", func(w http.ResponseWriter, r *http.Request) {
@@ -229,6 +233,23 @@ func StartHTTPServer(config HTTPServerConfig) error {
 	}
 
 	return nil
+}
+
+// recoveryMiddleware recovers from panics and logs them
+func recoveryMiddleware(next http.Handler, l *zap.Logger) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if err := recover(); err != nil {
+				l.Error("Panic in HTTP handler",
+					zap.Any("error", err),
+					zap.String("path", r.URL.Path),
+					zap.String("method", r.Method),
+				)
+				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			}
+		}()
+		next.ServeHTTP(w, r)
+	})
 }
 
 // corsMiddleware adds CORS headers to allow cross-origin requests
