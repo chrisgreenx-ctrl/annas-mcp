@@ -44,5 +44,5 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:${PORT:-8080}/health || exit 1
 
 # Run the HTTP server by default with Streamable HTTP transport (recommended for modern MCP)
-# Uses shell form to allow PORT environment variable expansion (required for Render/Railway/etc.)
-CMD ./annas-mcp http --host 0.0.0.0 --port ${PORT:-8080} --transport streamable
+# Uses exec form for compatibility with Smithery; PORT is handled by application
+CMD ["./annas-mcp", "http", "--host", "0.0.0.0", "--transport", "streamable"]
