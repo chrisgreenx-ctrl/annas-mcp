@@ -1,5 +1,7 @@
 # Anna's Archive MCP Server (and CLI Tool)
 
+[![smithery badge](https://smithery.ai/badge/chris/annas-mcp)](https://smithery.ai/server/chris/annas-mcp)
+
 [An MCP server](https://modelcontextprotocol.io/introduction) and CLI tool for searching and downloading documents from [Anna's Archive](https://annas-archive.org)
 
 > [!NOTE]
